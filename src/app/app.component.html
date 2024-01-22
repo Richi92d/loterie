@@ -1,10 +1,11 @@
 <div class="container">
-  <ul>
-    <li *ngFor="let number of resultStatistics.topNumbers" style="color: whitesmoke">
-      {{ number }}
-    </li>
-  </ul>
-  <p class="chance_number" style="color: goldenrod">
-    {{ resultStatistics.mostFrequentNumeroChance }}
-  </p>
+  <div *ngIf="resultStatistics">
+    <ul>
+      <li *ngFor="let number of resultStatistics.topNumbers">{{ number }}</li>
+      <li>{{ resultStatistics.mostFrequentNumeroChance }}</li>
+      <ul>
+        <li>{{ calculatePercentage().toFixed(4) }}%</li>
+      </ul>
+    </ul>
+  </div>
 </div>
