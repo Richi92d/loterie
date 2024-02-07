@@ -1,17 +1,11 @@
 <div class="container">
-  <div *ngIf="resultStatistics">
-    <h2 style="text-align: center;">Résultats et Prédictions</h2>
-    <ul>
-      <li>Les 5 numéros les plus fréquents : {{ resultStatistics.topNumbers.join(', ') }}</li>
-      <li style="color: goldenrod;">Le numéro chance le plus fréquent : {{ resultStatistics.mostFrequentNumeroChance }}
-      </li>
-    </ul>
-  </div>
-  <div *ngIf="predictedNumbers">
-    <h3 style="text-align: center;">Prédictions pour le prochain tirage :</h3>
-    <ul>
-      <li>Les numéros prédits : {{ predictedNumbers.topNumbers.join(', ') }}</li>
-      <li style="color: goldenrod;">Le numéro chance prédit : {{ predictedNumbers.predictedNumeroChance }}</li>
-    </ul>
-  </div>
+    <div *ngIf="predictedNumbers">
+        <h3 style="text-align: center;">Prédictions pour le prochain tirage :</h3>
+        <p>
+            Les numéros prédits : <span>{{ predictedNumbers.topNumbers.join(', ') }}</span>
+        </p>
+        <p style="color: goldenrod;">
+            Le numéro chance prédit : {{ predictedNumbers.predictedNumeroChance }}
+        </p>
+    </div>
 </div>

@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { lotoArray } from './result_array';
 
 interface LottoResult {
@@ -26,28 +27,20 @@ export class AppComponent implements OnInit {
   lottoResults: LottoResult[] = [];
   occurrencesNumbers: { [key: string]: number } = {};
   resultStatistics!: { topNumbers: string[]; mostFrequentNumeroChance: string; };
-  totalCombinations: number = this.calculateTotalCombinations();
   predictedNumbers: { topNumbers: string[]; predictedNumeroChance: string; } = { topNumbers: [], predictedNumeroChance: '' };
   percentage: number = 0;
+  totalCombinations: number = 1906884;
 
-  constructor() { }
+  constructor(private datePipe: DatePipe) { }
 
   ngOnInit(): void {
     this.lottoResults = this.flattenLotoArray(lotoArray);
     this.calculateProbabilities();
-    this.displayResults();
     this.predictNextNumbers();
-    this.calculatePercentage();
   }
 
   flattenLotoArray(arr: any[]): LottoResult[] {
     return arr.flatMap((innerArray: any) => innerArray);
-  }
-
-  calculateTotalCombinations(): number {
-    const totalNumbers = 49;
-    const totalNumeroChances = 10;
-    return this.calculateCombinations(totalNumbers, 5) * totalNumeroChances;
   }
 
   calculateCombinations(n: number, k: number): number {
@@ -74,15 +67,6 @@ export class AppComponent implements OnInit {
       if (numeroChanceValue !== undefined) {
         this.occurrencesNumbers[numeroChanceValue] = (this.occurrencesNumbers[numeroChanceValue] || 0) + 1;
       }
-
-      // Secondary draw
-      for (let i = 1; i <= 5; i++) {
-        const bouleKeySecondTirage = `boule_${i}_second_tirage` as keyof LottoResult;
-        const bouleValueSecondTirage = result[bouleKeySecondTirage];
-        if (bouleValueSecondTirage !== undefined) {
-          this.occurrencesNumbers[bouleValueSecondTirage] = (this.occurrencesNumbers[bouleValueSecondTirage] || 0) + 1;
-        }
-      }
     });
 
     const sortedOccurrencesNumbers = this.sortOccurrences(this.occurrencesNumbers);
@@ -98,17 +82,15 @@ export class AppComponent implements OnInit {
     return Object.entries(occurrences).sort((a, b) => b[1] - a[1]);
   }
 
-  calculatePercentage(): void {
-    const winningCombination = this.resultStatistics.topNumbers.concat([this.resultStatistics.mostFrequentNumeroChance]);
-    const numberOfOccurrences = this.calculateOccurrences(winningCombination);
-    const probability = 1 / this.totalCombinations;
-    this.percentage = (probability * numberOfOccurrences) * 100;
-  }
-
   calculateOccurrences(combination: string[]): number {
+    const mainNumbers = combination.slice(0, 5);
+    const numeroChance = combination[5];
+
     const occurrences = this.lottoResults.filter(result => {
-      const isMatch = combination.slice(0, 5).every(num => result[`boule_${num}` as keyof LottoResult] === num);
-      const numeroChanceMatch = result.numero_chance === combination[5];
+      const isMatch = mainNumbers.every(num =>
+        result[`boule_${num}` as keyof LottoResult] === num
+      );
+      const numeroChanceMatch = result.numero_chance === numeroChance;
 
       return isMatch && numeroChanceMatch;
     }).length;
@@ -123,22 +105,43 @@ export class AppComponent implements OnInit {
       .sort((a, b) => this.occurrencesNumbers[b] - this.occurrencesNumbers[a])
       .slice(0, 5);
 
-    // Obtenez les numéros aléatoires qui ne sont pas prédits à l'avance
-    const availableRandomNumbers = Object.keys(this.occurrencesNumbers)
-      .filter(num => !predictedTopNumbers.includes(num));
+    // Exclure les boules du dernier tirage des prédictions
+    const lastDrawNumbers: any = [];
+    for (let i = 1; i <= 5; i++) {
+      const bouleKey = `boule_${i}` as keyof LottoResult;
+      lastDrawNumbers.push(this.lottoResults[0][bouleKey]);
+    }
+    const predictedNumbersFiltered = predictedTopNumbers.filter(num => !lastDrawNumbers.includes(num));
 
-    // Triez les numéros aléatoires en fonction de la fréquence d'apparition
-    const sortedRandomNumbers = availableRandomNumbers.sort((a, b) => this.occurrencesNumbers[b] - this.occurrencesNumbers[a]);
+    // Obtenez les boules les plus susceptibles de suivre les numéros les plus fréquents
+    const nextNumbers: { [key: string]: number } = {};
+    this.lottoResults.forEach(result => {
+      predictedNumbersFiltered.forEach(num => {
+        for (let i = 1; i <= 5; i++) {
+          const bouleKey = `boule_${i}` as keyof LottoResult;
+          if (result[bouleKey] === num) {
+            const nextBouleKey = `boule_${i + 1}` as keyof LottoResult;
+            const nextBouleValue = result[nextBouleKey];
+            if (nextBouleValue !== undefined) {
+              nextNumbers[nextBouleValue] = (nextNumbers[nextBouleValue] || 0) + 1;
+            }
+          }
+        }
+      });
+    });
 
-    // Ajoutez les numéros aléatoires les plus fréquents à la prédiction
-    const remainingRandomNumbers = sortedRandomNumbers.slice(0, 10 - predictedTopNumbers.length);
-    const finalPredictedNumbers = predictedTopNumbers.concat(remainingRandomNumbers);
+    // Trier les boules suivantes par fréquence d'apparition
+    const sortedNextNumbers = Object.keys(nextNumbers)
+      .sort((a, b) => nextNumbers[b] - nextNumbers[a]);
+
+    // Sélectionner les 5 prochaines boules en fonction du total des combinaisons possibles
+    const finalPredictedNumbers = sortedNextNumbers.slice(0, 5).map(num => parseInt(num, 10) % this.totalCombinations + 1);
 
     // Obtenez le prochain numéro chance prédit en fonction de la probabilité
     const predictedNumeroChance = this.predictNumeroChance();
 
     // Mettez à jour la propriété predictedNumbers avec les valeurs calculées
-    this.predictedNumbers = { topNumbers: finalPredictedNumbers, predictedNumeroChance: predictedNumeroChance || '' };
+    this.predictedNumbers = { topNumbers: finalPredictedNumbers.map(String), predictedNumeroChance: predictedNumeroChance || '' };
   }
 
 
@@ -158,32 +161,10 @@ export class AppComponent implements OnInit {
   }
 
   calculateProbabilityForNumeroChance(numeroChance: string): number {
-    // Utilisez la date du dernier tirage
-    const lastDrawDate = new Date(this.lottoResults[0].date_de_tirage); // Assurez-vous que les résultats sont triés par date décroissante
-
-    // Calculez la différence de jours entre le dernier tirage et aujourd'hui
-    const daysSinceLastDraw = this.calculateDaysDifference(lastDrawDate, new Date());
-
-    // Poids de la probabilité en fonction de la différence de jours (à ajuster)
-    const daysWeight = 1 / (daysSinceLastDraw + 1); // Ajoutez 1 pour éviter la division par zéro
-
     // Probabilité de base basée sur le nombre d'occurrences
     const baseProbability = this.occurrencesNumbers[numeroChance] / this.lottoResults.length;
 
-    // Calculez la probabilité ajustée en appliquant le poids
-    const adjustedProbability = baseProbability * daysWeight;
-
-    return adjustedProbability;
+    return baseProbability;
   }
 
-  calculateDaysDifference(date1: Date, date2: Date): number {
-    const timeDifference = Math.abs(date2.getTime() - date1.getTime());
-    const daysDifference = Math.ceil(timeDifference / (1000 * 3600 * 24));
-    return daysDifference;
-  }
-
-  displayResults(): void {
-    const percentage = this.calculatePercentage();
-    // Display the results and predictions in your HTML as needed
-  }
 }
